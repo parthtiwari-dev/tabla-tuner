@@ -76,3 +76,13 @@ the drum, the ghar, and the measured pitch.
 - Ghars are numbered **1–16**, one-indexed, matching how a player counts them.
   Convert to zero-indexed only at array boundaries and comment where you do.
 - Pitch error is always in **cents**, never Hz, in anything user-facing.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

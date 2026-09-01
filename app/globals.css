@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0d0f12;
+  --color-surface: #16191f;
+  --color-raised: #1e232b;
+  --color-line: #2c333d;
+  --color-body: #d8dee7;
+  --color-muted: #8b95a3;
+
+  /* Flat / even / sharp. Blue-green-red carries through to the polar map. */
+  --color-flat: #4a9eff;
+  --color-even: #3ddc84;
+  --color-sharp: #ff5c5c;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Readings must not reflow as digits change (RULES D1). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

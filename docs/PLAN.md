@@ -9,19 +9,24 @@ Rough sizes assume focused sessions, not calendar days.
 
 ---
 
-## M0 — Skeleton (small)
+## M0 — Skeleton ✅ built, not yet deployed
 
-Next.js App Router + TypeScript + Tailwind, deployed to Vercel on day one so
-deployment is never a surprise later. A single page, mic permission request,
-live input-level meter.
+Next.js 16 App Router + React 19 + TypeScript + Tailwind 4. Mic permission
+request and a live input-level meter with a visible trigger threshold, on
+`/diagnostics`.
 
 **Done when:** the deployed URL shows a level meter that moves when you tap the
 drum. Confirms HTTPS mic access works on your actual phone, which is the only
 place that matters.
 
+- [x] Project builds, typechecks, and serves locally
+- [ ] **Deployed to Vercel** — still outstanding, and it gates the phone test:
+      `getUserMedia` needs HTTPS, so `localhost` on a laptop is the only place
+      the mic works until this is done
+
 ---
 
-## M1 — The DSP core, and the go/no-go 🔬
+## M1 — The DSP core, and the go/no-go 🔬 code done, gate not yet run
 
 The whole project's risk lives here. Pure functions, no UI.
 
@@ -44,9 +49,48 @@ fundamental attenuated 20 dB. Both must return the true f0.
 **Then a throwaway diagnostic page** — strike the drum, dump f0, clarity, and
 the FFT. Take it to the actual tabla.
 
-**Go/no-go gate.** Strike the same ghar ten times without touching the drum.
-Readings must agree within **±5 cents**. Then survey four positions 90° apart
-and confirm the numbers differ in a way that matches what your ear hears.
+### Built
+
+- [x] `cents.ts` — Hz ↔ MIDI ↔ cents, Western + Kali/Safed naming
+- [x] `fft.ts` — radix-2 FFT, Hann window, magnitude spectrum
+- [x] `mpm.ts` — NSDF, key-maxima picking, parabolic refinement, band-constrained
+      search, octave-ambiguity flag
+- [x] `harmonics.ts` — partial analysis, inharmonicity, Na/Tun comparison (D12)
+- [x] `onset.ts` — level-triggered strike capture, attack skip, refractory
+- [x] `capture.ts` + AudioWorklet — raw mic, all browser processing disabled
+- [x] `__fixtures__/synth.ts` — synthetic Tun and Na strokes
+- [x] `/diagnostics` bench — live readings, partial bars, spread statistic
+
+**50 tests passing.** The load-bearing ones:
+
+| Test | Result |
+|---|---|
+| Tun stroke, 6 pitches | < 1 cent |
+| **Na stroke, fundamental −20 dB** | **< 1 cent** |
+| Na with fundamental −34 dB | < 2 cents |
+| Never reports the 3rd harmonic | ✓ |
+| **Relative accuracy under inharmonicity** | **< 3 cents** |
+| Repeatability across 10 noisy strikes | < 5 cents |
+| Rejects silence and noise | ✓ |
+
+The relative-accuracy test is the one that matters most: with stretched
+partials, *absolute* error grows to ~20 cents, but ghar-to-ghar *differences*
+stay accurate to under 3 cents. That is the evenness survey's whole premise,
+and it now has a test behind it.
+
+### Known and accepted limitation
+
+Band-constrained autocorrelation reports a sub-multiple for a harmonic tone
+above the band — an 880 Hz tone reads as 293.3 Hz, because the signal genuinely
+*is* periodic there. This is the flip side of the property that solves the Na
+problem: the band asserts "the source is a dayan." Documented in the tests.
+Acceptable, because the microphone is pointed at a dayan.
+
+**Go/no-go gate — NOT YET RUN. Needs the real drum.**
+Strike the same ghar ten times without touching the drum. Readings must agree
+within **±5 cents** — read the Spread stat on `/diagnostics`. Then survey four
+positions 90° apart and confirm the numbers differ in a way that matches what
+your ear hears.
 
 - ✅ Passes → continue.
 - ❌ Fails → stop and diagnose before building anything else. Likely causes, in
