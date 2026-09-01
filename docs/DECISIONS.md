@@ -314,3 +314,39 @@ and never asked about.
   is not tunable by anyone and this becomes a repair, not a software problem.
 - **Tolerance threshold** — what spread counts as "even enough"? Provisionally
   10 cents. Should be calibrated against your own ear during M2, not guessed.
+
+---
+
+## D19 — Continuous listening. No buttons, no hammer instructions
+**2026-09-01 · User correction**
+
+*"The app should keep detecting audio... if it's pitched high or low, then it
+shouldn't tell me to hit the hammer which way because I know it. And I know
+that my hammer sound would actually be recorded by the app... so this isn't
+really a problem for me."*
+
+Two changes, one of which turned a problem into a feature.
+
+**No direction advice.** Ten years of playing; he knows which way to hit and
+how. Telling him is noise. The app shows the number and stays quiet.
+
+**Hammer blows in the microphone are the calibration mechanism, not
+interference.** The previous design had tap-count buttons, which need a free
+hand he does not have. Since the mic hears the hammer anyway, the app counts
+blows itself:
+
+    na(-20c) -> tap -> tap -> na(-6c)   =>  2 taps moved it 14 cents
+
+Discriminator is NSDF **clarity**: a `na` is a tonal stroke on a harmonic
+membrane and scores high; a hammer blow on the braided gajra is a short hard
+click with no clean periodic decay and scores low. Threshold is a setting
+(`naClarity`, default 0.78) and the live classification is displayed, because
+it is a heuristic and a visible heuristic is one he can adjust.
+
+Stakes are deliberately low: a mis-sorted onset costs a slightly wrong
+cents-per-tap figure, which is informational only. Nothing acts on it.
+
+**How the drum actually gets tuned**, which was his question: he already has
+the hammer skill. What he lacks is *perception* of the error and *memory* of
+what the last few minutes did. The app supplies exactly those two and nothing
+else.

@@ -1,109 +1,129 @@
 "use client";
 
 /**
- * The tuning screen.
+ * The tuner.
  *
- * One screen, one number. No ghar numbering, no position tracking, no survey
- * phase (D16). You are looking at the drum; the app is not. It reads `Na`,
- * tells you how far off you are, and — the part that matters — shows whether
- * you are converging or making it worse.
+ * It listens continuously and never asks for a button press while both hands
+ * are busy. It does not say which way to hit — he has ten years of that and
+ * does not need telling (D19). It supplies the two things he cannot supply
+ * himself: reliable perception of the error, and memory of what the last few
+ * minutes of hammering actually did.
  *
- * Design brief: quiet and instrument-like. Dark, restrained, few colours,
- * large type, legible at arm's length at an angle (RULES D1).
+ * Design brief: quiet and instrument-like. Dark, few colours, large type,
+ * legible at arm's length at an angle (RULES D1).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { startCapture, MicPermissionError, type CaptureHandle } from "@/lib/audio/capture";
 import { StrikeDetector } from "@/lib/audio/onset";
-import { detectPitch, detectPitchNearAnchor, DAYAN_F_MIN, DAYAN_F_MAX } from "@/lib/audio/mpm";
 import { Drone } from "@/lib/audio/drone";
-import { describePitch } from "@/lib/audio/cents";
-import { noteOptions, suggestTarget, type NoteOption } from "@/lib/tuning/notes";
-import { TuningSession, TRAIL_LENGTH, type Strike, type Trend } from "@/lib/tuning/session";
+import { TuningSession, type SessionSnapshot, type Correction } from "@/lib/tuning/session";
+import { classifyOnset } from "@/lib/tuning/classify";
+import { noteOptions, suggestTarget, targetFor, type NoteOption } from "@/lib/tuning/notes";
+import {
+  loadSettings,
+  saveSettings,
+  clearSettings,
+  DEFAULT_SETTINGS,
+  type Settings,
+} from "@/lib/tuning/storage";
+import {
+  Meter,
+  TrendLine,
+  EventStrip,
+  HeadroomCard,
+  SettingsSheet,
+} from "./components";
 
-type Phase = "off" | "finding" | "tuning";
+type Phase = "off" | "headroom" | "finding" | "tuning";
 
-/** Full-scale deflection of the meter, in cents. */
-const SCALE = 50;
+const EMPTY: SessionSnapshot = {
+  latest: null,
+  trail: [],
+  spread: 0,
+  trend: "unknown",
+  pendingTaps: 0,
+  centsPerTap: null,
+  even: false,
+  corrections: 0,
+};
 
 export default function TunePage() {
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [phase, setPhase] = useState<Phase>("off");
   const [error, setError] = useState<string | null>(null);
-  const [target, setTarget] = useState<NoteOption | null>(null);
-  const [options, setOptions] = useState<NoteOption[]>([]);
-  const [heard, setHeard] = useState<number | null>(null);
 
-  const [latest, setLatest] = useState<Strike | null>(null);
-  const [trail, setTrail] = useState<Strike[]>([]);
-  const [spread, setSpread] = useState(0);
-  const [trend, setTrend] = useState<Trend>("unknown");
-  const [perTap, setPerTap] = useState<number | null>(null);
+  const [target, setTarget] = useState<NoteOption | null>(null);
+  const [heard, setHeard] = useState<number | null>(null);
+  const [snapshot, setSnapshot] = useState<SessionSnapshot>(EMPTY);
+  const [lastKind, setLastKind] = useState<"na" | "tap" | null>(null);
   const [droneOn, setDroneOn] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const captureRef = useRef<CaptureHandle | null>(null);
   const detectorRef = useRef<StrikeDetector | null>(null);
   const sessionRef = useRef<TuningSession | null>(null);
   const droneRef = useRef<Drone | null>(null);
   const targetRef = useRef<NoteOption | null>(null);
-  const pendingTap = useRef<{ before: number; taps: number } | null>(null);
+  const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
+
+  // Settings load client-side only; localStorage is unavailable during SSR.
+  useEffect(() => {
+    const loaded = loadSettings();
+    setSettings(loaded);
+    settingsRef.current = loaded;
+  }, []);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     targetRef.current = target;
   }, [target]);
 
-  const refresh = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session) return;
-    setLatest(session.latest ?? null);
-    setTrail(session.trail);
-    setSpread(session.spread);
-    setTrend(session.trend);
-    setPerTap(session.centsPerTap);
+  const persist = useCallback((next: Partial<Settings>) => {
+    setSettings((prev) => {
+      const merged = { ...prev, ...next };
+      settingsRef.current = merged;
+      saveSettings(merged);
+      return merged;
+    });
   }, []);
 
-  const onStrike = useCallback(
-    (window: Float32Array, sampleRate: number) => {
-      droneRef.current?.duck();
-      const current = targetRef.current;
+  // ---- audio -------------------------------------------------------------
 
-      // Before a target exists, search the whole dayan range. After, stay
-      // within a fifth of the target: wide enough to show a badly-off drum,
-      // far too narrow for a 3rd-harmonic error to slip through (RULES B3).
-      const result = current
-        ? detectPitchNearAnchor(window, sampleRate, current.hz, 500)
-        : detectPitch(window, sampleRate, { fMin: DAYAN_F_MIN, fMax: DAYAN_F_MAX });
+  const onOnset = useCallback((window: Float32Array, sampleRate: number) => {
+    droneRef.current?.duck();
 
-      if (result.hz <= 0) return;
+    const current = targetRef.current;
+    const { onset } = classifyOnset(window, sampleRate, {
+      targetHz: current?.hz,
+      naClarity: settingsRef.current.naClarity,
+    });
 
-      if (!current) {
-        setHeard(result.hz);
-        setOptions(noteOptions(result.hz));
-        return;
-      }
+    setLastKind(onset.kind);
 
-      const session = sessionRef.current;
-      if (!session) return;
+    // Before a target exists we are only listening for where the drum sits.
+    if (!current) {
+      if (onset.kind === "na") setHeard(onset.hz);
+      return;
+    }
 
-      const strike = session.add(result.hz, result.clarity);
+    const session = sessionRef.current;
+    if (!session) return;
 
-      // Close out a pending correction: we now know what those taps achieved,
-      // which is how the hammer gets calibrated.
-      const pending = pendingTap.current;
-      if (pending) {
-        session.recordCorrection({
-          before: pending.before,
-          after: strike.cents,
-          taps: pending.taps,
-          direction: pending.before < 0 ? "down" : "up",
-        });
-        pendingTap.current = null;
-      }
+    const before = session.allCorrections.length;
+    session.observe(onset);
+    setSnapshot(session.snapshot());
 
-      refresh();
-    },
-    [refresh],
-  );
+    // Calibration is a property of his hand and hammer, so it outlives the
+    // session. Persist as soon as a new correction is booked.
+    if (session.allCorrections.length !== before) {
+      persist({ corrections: session.allCorrections.slice(0, 60) });
+    }
+  }, [persist]);
 
   const start = useCallback(async () => {
     setError(null);
@@ -113,12 +133,12 @@ export default function TunePage() {
         const detector = detectorRef.current;
         if (!detector) return;
         const window = detector.push(block);
-        if (window) onStrike(window, sampleRate);
+        if (window) onOnset(window, sampleRate);
       });
       sampleRate = handle.sampleRate;
       captureRef.current = handle;
       detectorRef.current = new StrikeDetector({ sampleRate });
-      setPhase("finding");
+      setPhase(settingsRef.current.headroomAcknowledged ? "finding" : "headroom");
     } catch (err) {
       setError(
         err instanceof MicPermissionError
@@ -126,7 +146,7 @@ export default function TunePage() {
           : `Could not start audio: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-  }, [onStrike]);
+  }, [onOnset]);
 
   const stop = useCallback(async () => {
     droneRef.current?.stop();
@@ -136,28 +156,41 @@ export default function TunePage() {
     captureRef.current = null;
     detectorRef.current = null;
     sessionRef.current = null;
+    targetRef.current = null;
     setPhase("off");
     setTarget(null);
     setHeard(null);
-    setLatest(null);
-    setTrail([]);
+    setSnapshot(EMPTY);
+    setLastKind(null);
   }, []);
 
   useEffect(() => () => void captureRef.current?.stop(), []);
 
-  const choose = useCallback((option: NoteOption) => {
-    setTarget(option);
-    targetRef.current = option;
-    sessionRef.current = new TuningSession(option.hz);
-    droneRef.current?.setFrequency(option.hz);
-    setPhase("tuning");
-  }, []);
+  // ---- actions -----------------------------------------------------------
+
+  const choose = useCallback(
+    (option: NoteOption) => {
+      setTarget(option);
+      targetRef.current = option;
+      sessionRef.current = new TuningSession(
+        option.hz,
+        settingsRef.current.tolerance,
+        settingsRef.current.corrections as Correction[],
+      );
+      setSnapshot(sessionRef.current.snapshot());
+      droneRef.current?.setFrequency(option.hz);
+      persist({ pitchClass: option.pitchClass });
+      setPhase("tuning");
+    },
+    [persist],
+  );
 
   const toggleDrone = useCallback(async () => {
     if (droneOn) {
       droneRef.current?.stop();
       droneRef.current = null;
       setDroneOn(false);
+      persist({ droneEnabled: false });
       return;
     }
     if (!target) return;
@@ -165,78 +198,139 @@ export default function TunePage() {
     await drone.start(target.hz);
     droneRef.current = drone;
     setDroneOn(true);
-  }, [droneOn, target]);
-
-  const recordTaps = useCallback(
-    (taps: number) => {
-      const session = sessionRef.current;
-      if (!session?.latest) return;
-      pendingTap.current = { before: session.latest.cents, taps };
-      refresh();
-    },
-    [refresh],
-  );
+    persist({ droneEnabled: true });
+  }, [droneOn, target, persist]);
 
   const undo = useCallback(() => {
     sessionRef.current?.undo();
-    pendingTap.current = null;
-    refresh();
-  }, [refresh]);
+    if (sessionRef.current) setSnapshot(sessionRef.current.snapshot());
+  }, []);
 
-  // ---- rendering ---------------------------------------------------------
+  const clearTrail = useCallback(() => {
+    sessionRef.current?.clearTrail();
+    if (sessionRef.current) setSnapshot(sessionRef.current.snapshot());
+  }, []);
+
+  const changeNote = useCallback(() => {
+    setTarget(null);
+    targetRef.current = null;
+    setHeard(null);
+    setPhase("finding");
+  }, []);
+
+  const resetAll = useCallback(() => {
+    clearSettings();
+    setSettings(DEFAULT_SETTINGS);
+    settingsRef.current = DEFAULT_SETTINGS;
+    setShowSettings(false);
+    void stop();
+  }, [stop]);
+
+  // Tolerance changes mid-session should take effect immediately.
+  useEffect(() => {
+    if (sessionRef.current) {
+      sessionRef.current.tolerance = settings.tolerance;
+      setSnapshot(sessionRef.current.snapshot());
+    }
+  }, [settings.tolerance]);
+
+  // ---- screens -----------------------------------------------------------
 
   if (phase === "off") {
     return (
       <Shell>
-        <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-8 text-center">
+        <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-10 text-center">
           <div>
             <h1 className="text-2xl font-medium tracking-tight">Tabla Tuner</h1>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">
-              Play <span className="text-body">na</span> at the kinar. Hammer, strike again,
-              rotate. It watches whether you are getting closer.
+            <p className="mx-auto mt-4 max-w-[16rem] text-sm leading-relaxed text-muted">
+              Play <span className="text-body">na</span> at the kinar and it listens. Hammer,
+              play again, rotate. It tells you whether you are getting closer.
             </p>
           </div>
           <button
             onClick={start}
-            className="rounded-full border border-line bg-raised px-10 py-5 text-lg font-medium transition hover:border-body"
+            className="rounded-full border border-line bg-raised px-12 py-5 text-lg transition hover:border-body"
           >
             Begin
           </button>
           {error && <p className="max-w-xs text-sm leading-relaxed text-warn">{error}</p>}
+          <p className="text-xs text-muted opacity-50">
+            Runs entirely on your device. Nothing is recorded or sent.
+          </p>
         </div>
       </Shell>
     );
   }
 
-  if (phase === "finding") {
+  if (phase === "headroom") {
     return (
       <Shell onStop={stop}>
-        <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-10 text-center">
+        <HeadroomCard
+          onAcknowledge={() => {
+            persist({ headroomAcknowledged: true });
+            setPhase("finding");
+          }}
+        />
+      </Shell>
+    );
+  }
+
+  if (phase === "finding") {
+    const suggestion = heard !== null ? suggestTarget(heard, settings.a4) : null;
+    const options = heard !== null ? noteOptions(heard, settings.a4) : [];
+    const remembered =
+      settings.pitchClass !== null && heard !== null
+        ? {
+            ...suggestion!,
+            pitchClass: settings.pitchClass,
+            name: options[settings.pitchClass].name,
+            hz: targetFor(settings.pitchClass, heard, settings.a4),
+          }
+        : null;
+
+    return (
+      <Shell onStop={stop}>
+        <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-8 text-center">
           {heard === null ? (
             <>
-              <p className="text-lg text-muted">Play na</p>
-              <p className="max-w-xs text-sm leading-relaxed text-muted">
-                Once, so it can hear where your drum sits.
+              <p className="text-xl">Play na</p>
+              <p className="max-w-[15rem] text-sm leading-relaxed text-muted">
+                Once, so it can hear where your drum is sitting.
               </p>
+              <div className="h-1 w-1 animate-pulse rounded-full bg-muted" />
             </>
           ) : (
             <>
-              <p className="text-sm uppercase tracking-widest text-muted">Your drum is near</p>
+              <p className="text-xs uppercase tracking-[0.25em] text-muted">Your drum is near</p>
               <button
-                onClick={() => choose(suggestTarget(heard))}
-                className="text-7xl font-light tracking-tight transition hover:text-even"
+                onClick={() => choose(suggestion!)}
+                className="text-8xl font-extralight leading-none tracking-tight transition hover:text-even"
               >
-                {suggestTarget(heard).name}
+                {suggestion!.name}
               </button>
-              <p className="text-sm text-muted">Tap to tune to it, or choose another</p>
-              <div className="grid max-w-sm grid-cols-6 gap-2">
+
+              {remembered && remembered.pitchClass !== suggestion!.pitchClass && (
+                <button
+                  onClick={() => choose(remembered)}
+                  className="text-sm text-muted underline-offset-4 transition hover:text-body hover:underline"
+                >
+                  Last time you tuned to {remembered.name}
+                </button>
+              )}
+
+              <p className="text-xs text-muted">Tap to accept, or choose another</p>
+              <div className="grid w-full max-w-[20rem] grid-cols-6 gap-1.5">
                 {options.map((option) => (
                   <button
                     key={option.pitchClass}
                     onClick={() => choose(option)}
                     disabled={!option.reachable}
-                    className="tabular rounded-md border border-line py-3 text-sm transition hover:border-body disabled:opacity-25"
-                    title={option.reachable ? undefined : "Out of range for this drum"}
+                    className={`tabular rounded border py-3 text-sm transition disabled:opacity-20 ${
+                      option.pitchClass === suggestion!.pitchClass
+                        ? "border-body"
+                        : "border-line hover:border-muted"
+                    }`}
+                    title={option.reachable ? undefined : "Outside this drum's range"}
                   >
                     {option.name}
                   </button>
@@ -249,170 +343,105 @@ export default function TunePage() {
     );
   }
 
-  const cents = latest?.cents ?? 0;
-  const inTune = latest ? Math.abs(cents) <= 5 : false;
-  const advice = sessionRef.current?.advise() ?? null;
+  // ---- tuning ------------------------------------------------------------
+
+  const { latest, trail, spread, trend, pendingTaps, centsPerTap, even } = snapshot;
+  const cents = latest?.cents ?? null;
+  const inTune = cents !== null && Math.abs(cents) <= settings.tolerance;
 
   return (
     <Shell onStop={stop}>
-      {/* Target — small, top, out of the way */}
-      <div className="flex items-baseline justify-between text-sm text-muted">
-        <span className="tabular">
+      {showSettings && (
+        <SettingsSheet
+          tolerance={settings.tolerance}
+          naClarity={settings.naClarity}
+          a4={settings.a4}
+          calibrationCount={settings.corrections.length}
+          onTolerance={(v) => persist({ tolerance: v })}
+          onNaClarity={(v) => persist({ naClarity: v })}
+          onA4={(v) => persist({ a4: v })}
+          onReset={resetAll}
+          onShowHeadroom={() => {
+            setShowSettings(false);
+            setPhase("headroom");
+          }}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* target — small, top, out of the way */}
+      <div className="flex items-center justify-between text-sm">
+        <button onClick={changeNote} className="tabular transition hover:text-even">
           <span className="text-body">{target?.name}</span>
-          <span className="ml-2 opacity-60">{target?.hz.toFixed(1)} Hz</span>
-        </span>
-        <button
-          onClick={toggleDrone}
-          className={`rounded px-2 py-1 text-xs uppercase tracking-widest transition ${
-            droneOn ? "text-body" : "text-muted hover:text-body"
-          }`}
-        >
-          {droneOn ? "tone on" : "tone off"}
+          <span className="ml-2 text-muted opacity-60">{target?.hz.toFixed(1)} Hz</span>
         </button>
+        <div className="flex items-center gap-4 text-xs uppercase tracking-widest text-muted">
+          <button
+            onClick={toggleDrone}
+            className={`transition hover:text-body ${droneOn ? "text-body" : ""}`}
+          >
+            tone
+          </button>
+          <button onClick={() => setShowSettings(true)} className="transition hover:text-body">
+            settings
+          </button>
+        </div>
       </div>
 
-      {/* The number */}
-      <div className="mt-14 text-center">
-        {latest ? (
+      {/* the number */}
+      <div className="mt-16 text-center">
+        {cents !== null ? (
           <>
             <div
-              className={`tabular text-8xl font-extralight leading-none tracking-tighter transition-colors ${
+              className={`tabular text-[6.5rem] font-extralight leading-none tracking-tighter transition-colors ${
                 inTune ? "text-even" : "text-warn"
               }`}
             >
               {inTune ? "0" : `${cents > 0 ? "+" : "−"}${Math.abs(cents).toFixed(0)}`}
             </div>
-            <div className="mt-3 text-sm uppercase tracking-[0.3em] text-muted">
+            <div className="mt-4 text-xs uppercase tracking-[0.35em] text-muted">
               {inTune ? "on it" : cents < 0 ? "flat" : "sharp"}
             </div>
           </>
         ) : (
-          <div className="py-12 text-lg text-muted">Play na</div>
+          <div className="py-14 text-lg text-muted">Play na</div>
         )}
       </div>
 
-      {/* Meter and trail share one axis, so scatter reads directly against target */}
-      <div className="mt-12">
-        <div className="relative h-20">
-          {/* centre line */}
-          <div className="absolute left-1/2 top-0 h-10 w-px -translate-x-1/2 bg-line" />
-          <div className="absolute left-0 top-[19px] h-px w-full bg-line/40" />
-
-          {/* current reading */}
-          {latest && (
-            <div
-              className={`absolute top-1 h-8 w-1 -translate-x-1/2 rounded-full transition-[left] duration-150 ${
-                inTune ? "bg-even" : "bg-warn"
-              }`}
-              style={{ left: `${position(cents)}%` }}
-            />
-          )}
-
-          {/* trail: one turn of the drum, oldest faintest */}
-          <div className="absolute top-12 h-6 w-full">
-            {trail.map((strike, i) => (
-              <div
-                key={strike.id}
-                className="absolute h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-body"
-                style={{
-                  left: `${position(strike.cents)}%`,
-                  opacity: Math.max(0.12, 1 - i / TRAIL_LENGTH),
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-baseline justify-between text-xs text-muted">
-          <span className="tabular">
-            spread <span className="text-body">{spread.toFixed(0)}</span> cents
-            <span className="ml-1 opacity-60">
-              · {trail.length}/{TRAIL_LENGTH}
-            </span>
-          </span>
-          <span className={trendTone(trend)}>{trendLabel(trend)}</span>
-        </div>
+      <div className="mt-14">
+        <Meter cents={cents} trail={trail} tolerance={settings.tolerance} />
+        <TrendLine
+          spread={spread}
+          count={trail.length}
+          trend={trend}
+          tolerance={settings.tolerance}
+        />
       </div>
 
-      {/* What to do */}
-      <div className="mt-10 min-h-16 text-center">
-        {advice ? (
-          <>
-            <p className="text-lg">
-              Tap <span className="font-medium">{advice.direction}</span> on the gajra
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              {advice.calibrated
-                ? `about ${advice.taps} ${advice.taps === 1 ? "tap" : "taps"}`
-                : "light taps, then strike again"}
-            </p>
-          </>
-        ) : latest ? (
-          <p className="text-lg text-even">Leave this one. Rotate.</p>
-        ) : null}
+      <div className="mt-6">
+        <EventStrip pendingTaps={pendingTaps} lastKind={lastKind} centsPerTap={centsPerTap} />
       </div>
 
-      {/* Tap counter — how the hammer gets learned */}
-      {latest && (
-        <div className="mt-10">
-          <div className="text-center text-xs uppercase tracking-widest text-muted">
-            {pendingTap.current ? "recorded — now strike again" : "how many taps did you give it?"}
-          </div>
-          <div className="mt-3 flex justify-center gap-2">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                onClick={() => recordTaps(n)}
-                className="tabular h-12 w-12 rounded-full border border-line text-base transition hover:border-body"
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          {perTap !== null && (
-            <p className="mt-3 text-center text-xs text-muted">
-              your taps move about{" "}
-              <span className="tabular text-body">{perTap.toFixed(0)} cents</span> each
-            </p>
-          )}
-        </div>
+      {even && (
+        <p className="mt-10 text-center text-sm text-even">
+          Every strike of the last turn is within {settings.tolerance} cents. Trust your ear over
+          this.
+        </p>
       )}
 
-      <div className="mt-10 flex justify-center gap-6 text-sm text-muted">
+      <div className="mt-12 flex justify-center gap-6 text-xs uppercase tracking-widest text-muted">
         <button onClick={undo} className="transition hover:text-body">
-          Undo last
+          undo
+        </button>
+        <button onClick={clearTrail} className="transition hover:text-body">
+          clear trail
         </button>
         <Link href="/diagnostics" className="transition hover:text-body">
-          Diagnostics
+          diagnostics
         </Link>
       </div>
     </Shell>
   );
-}
-
-/** Map a cents deviation to a 0-100% position on the meter. */
-function position(cents: number): number {
-  const clamped = Math.max(-SCALE, Math.min(SCALE, cents));
-  return ((clamped + SCALE) / (2 * SCALE)) * 100;
-}
-
-function trendLabel(trend: Trend): string {
-  switch (trend) {
-    case "converging":
-      return "getting better";
-    case "diverging":
-      return "getting worse";
-    case "steady":
-      return "holding";
-    default:
-      return "";
-  }
-}
-
-function trendTone(trend: Trend): string {
-  if (trend === "converging") return "text-even";
-  if (trend === "diverging") return "text-warn";
-  return "text-muted";
 }
 
 function Shell({ children, onStop }: { children: React.ReactNode; onStop?: () => void }) {
@@ -421,7 +450,7 @@ function Shell({ children, onStop }: { children: React.ReactNode; onStop?: () =>
       {onStop && (
         <button
           onClick={onStop}
-          className="mb-2 text-xs uppercase tracking-widest text-muted transition hover:text-body"
+          className="mb-4 text-xs uppercase tracking-widest text-muted transition hover:text-body"
         >
           ← stop
         </button>
