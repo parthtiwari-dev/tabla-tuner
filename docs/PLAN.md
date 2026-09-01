@@ -100,46 +100,93 @@ your ear hears.
 
 ---
 
-## M2 — The survey (medium)
+## M1b — Strip to `Na` only (small) ⟵ next
+
+Applying D13/D14 before building further, so M2 isn't built on the wrong shape.
+
+- Remove the anchor/survey **mode switch**; the first `Na` of a pass sets the
+  reference band silently
+- Remove `compareStrokes` from `harmonics.ts` (D12 withdrawn); keep the partial
+  analysis, which is still useful in diagnostics
+- Interface shows a bare note letter — no Kali/Safed, no octave (PRD §6).
+  `INDIAN_NAMES` stays in `cents.ts`, unrendered
+- `/diagnostics` keeps Hz, clarity and partial bars; it is a bench, not the app
+
+No new DSP. The detector is unchanged — this is deletion.
+
+---
+
+## M2 — The tuning screen (medium) ⟵ REPLACES the survey design below
+
+**Superseded design kept below for context only. Build this instead.**
+
+Per D16/D17/D18, there is no survey and no position tracking. One screen:
+
+- **Headroom gate first** — where do the gattas sit? Out of travel means stop
+- **Target note** — suggested from the drum, or picked from twelve; octave
+  inferred silently
+- **Live reading** — strike `Na`, get one large number: how far off, which way
+- **Rolling trail** — last ~16 readings, unlabelled, showing scatter collapsing
+- **Optional drone** at the target, off by default, muted briefly after each
+  strike so it cannot confuse the detector
+- Quiet, instrument-like: dark, restrained, few colours, large type
+
+No ghar numbers. No ring diagram. No counting. No pass.
+
+**Done when:** you can tune the drum with it and the trail visibly tightens.
+
+### Superseded — the survey design (D13/D14, replaced by D16)
 
 The core feature.
 
 - Session model: 16 ghars × N strikes, median + spread per ghar
-- Anchor step: `Tun` strokes → absolute f0
-- Survey step: auto-advance on detected strike (RULES D2), with undo
-- Audio cues for recorded / next / didn't-hear (RULES D3)
-- **The polar map** — 16 spokes, blue→green→red, cents at each, headline spread
+- Band bootstrapped from the first strike of the pass (D13)
+- **"Turn one ghar"** between positions — the drum rotates, the hand does not
+  (D14). Auto-advance on detected strike (RULES D2), with undo, plus a
+  restart-pass for when you lose your place
+- Audio cues for recorded / turn / didn't-hear (RULES D3) — you are looking at
+  the drum, not the screen
+- **The ring** — 16 marks, low/even/high, headline spread
 
-**Done when:** you can walk the drum in under 3 minutes hands-free and get a
-picture that matches your ear. This is the screen that doesn't exist anywhere
-else; give it the most design attention of anything in the project.
+**Done when:** you can walk the drum in one turn and get a picture that matches
+what your ear already told you. This is the screen that doesn't exist anywhere
+else; give it the most design attention in the project.
+
+Open: how many strikes per ghar? 3 is the assumption (48 strikes a pass). If
+M1's repeatability is strong, 1-2 may do. Decide from real data, not taste.
 
 ---
 
 ## M3 — Correction guidance (small–medium)
 
-Turning the map into instructions.
+Turning the map into instructions. The player asked for the **full guided
+loop**, so this is not optional polish.
 
 - Encode the traditional sequence `1, 9, 14, 6, 11, 3, 8, 16, 5, 13, 2, 10, 15,
   7, 12, 4`, filtered to ghars actually out of tolerance
 - One instruction at a time: which ghar, which hammer face, which direction,
   "two or three light taps"
-- Re-measure the corrected ghar **and its opposite** after each pass
-- Convergence tracking across passes
+- Re-measure the corrected ghar **and its opposite** after each hit
+- Convergence tracking across passes — the spread is the number being watched
+- A drum whose spread will not come down across several passes gets flagged as
+  a possible instrument problem (replaces the withdrawn D12 check)
 - All safety rails from RULES §C
 
 **Done when:** following it end to end actually reduces measured spread.
 
 ---
 
-## M4 — Absolute tuning and the scale module (medium)
+## M4 — Pull to pitch (small) — optional, and only after the head is even
 
-- Diameter setting → safe range, as a **hard block** (RULES C1)
-- Target scale picker, Western + Kali/Safed together
-- The Sa → Pa → Ma ladder, with the notes to avoid
-- Drone reference tone at the chosen Sa
-- "Find my drum's natural pitch" mode for solo riyaz
-- Gatta phase: `1-5, 2-6, 3-7, 4-8`, then re-check evenness
+Cut back hard from the old scale module (D13). What survives:
+
+- Diameter setting → safe range, as a **hard block** (RULES C1). Not teaching —
+  it stops the app suggesting a tension that splits a head.
+- Gatta pass: `1-5, 2-6, 3-7, 4-8` to move the whole drum bodily onto a note,
+  then re-check evenness because coarse tuning disturbs it.
+
+Deferred indefinitely: raga-aware targets, Sa/Pa/Ma ladder, drone reference,
+natural-pitch finder, Kali/Safed naming.
 
 ---
 

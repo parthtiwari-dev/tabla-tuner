@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
+/* Quiet and instrument-like: dark ground, few colours, large type.
+   Only two states get colour — on target, and not. Direction is carried by
+   the meter position and the word, never by hue. */
 @theme {
-  --color-ink: #0d0f12;
-  --color-surface: #16191f;
-  --color-raised: #1e232b;
-  --color-line: #2c333d;
-  --color-body: #d8dee7;
-  --color-muted: #8b95a3;
+  --color-ink: #0b0d10;
+  --color-surface: #14171c;
+  --color-raised: #1a1e24;
+  --color-line: #2a3038;
+  --color-body: #e2e6ec;
+  --color-muted: #757f8c;
 
-  /* Flat / even / sharp. Blue-green-red carries through to the polar map. */
-  --color-flat: #4a9eff;
-  --color-even: #3ddc84;
-  --color-sharp: #ff5c5c;
+  --color-even: #6ec49a;
+  --color-warn: #c9a227;
 }
 
 html {

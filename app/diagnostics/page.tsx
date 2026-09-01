@@ -172,7 +172,7 @@ export default function DiagnosticsPage() {
       </header>
 
       {error && (
-        <p className="mt-4 rounded-md border border-sharp/40 bg-sharp/10 p-4 text-sm leading-relaxed text-sharp">
+        <p className="mt-4 rounded-md border border-warn/40 bg-warn/10 p-4 text-sm leading-relaxed text-warn">
           {error}
         </p>
       )}
@@ -182,7 +182,7 @@ export default function DiagnosticsPage() {
         <button
           onClick={running ? stop : start}
           className={`rounded-md px-6 py-3 font-medium transition ${
-            running ? "bg-sharp text-ink" : "bg-even text-ink"
+            running ? "bg-warn text-ink" : "bg-even text-ink"
           } hover:opacity-90`}
         >
           {running ? "Stop" : "Start listening"}
@@ -213,11 +213,11 @@ export default function DiagnosticsPage() {
         </div>
         <div className="relative mt-2 h-3 overflow-hidden rounded-full bg-raised">
           <div
-            className="h-full rounded-full bg-flat transition-[width] duration-75"
+            className="h-full rounded-full bg-muted transition-[width] duration-75"
             style={{ width: `${meterPct}%` }}
           />
           <div
-            className="absolute top-0 h-full w-0.5 bg-sharp"
+            className="absolute top-0 h-full w-0.5 bg-warn"
             style={{ left: `${thresholdPct}%` }}
             title="Strike threshold"
           />
@@ -276,8 +276,8 @@ export default function DiagnosticsPage() {
                   Math.abs(latest.name.cents) < 5
                     ? "text-even"
                     : latest.name.cents > 0
-                      ? "text-sharp"
-                      : "text-flat"
+                      ? "text-warn"
+                      : "text-muted"
                 }`}
               >
                 {formatCents(latest.name.cents, 5)}
@@ -286,7 +286,7 @@ export default function DiagnosticsPage() {
             <div className="tabular mt-2 text-sm text-muted">
               {latest.hz.toFixed(2)} Hz · clarity {latest.clarity.toFixed(3)}
               {latest.ambiguous && (
-                <span className="ml-2 text-sharp">· octave ambiguous</span>
+                <span className="ml-2 text-warn">· octave ambiguous</span>
               )}
             </div>
 
@@ -302,7 +302,7 @@ export default function DiagnosticsPage() {
                     <span className="tabular w-6 text-muted">{p.k}×</span>
                     <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-raised">
                       <div
-                        className="h-full rounded-full bg-flat"
+                        className="h-full rounded-full bg-muted"
                         style={{ width: `${p.relative * 100}%` }}
                       />
                     </div>
@@ -370,7 +370,7 @@ export default function DiagnosticsPage() {
                   <span className="w-24 text-right text-muted">{r.hz.toFixed(2)} Hz</span>
                   <span
                     className={`w-20 text-right ${
-                      Math.abs(delta) < 5 ? "text-even" : delta > 0 ? "text-sharp" : "text-flat"
+                      Math.abs(delta) < 5 ? "text-even" : delta > 0 ? "text-warn" : "text-muted"
                     }`}
                   >
                     {delta >= 0 ? "+" : ""}
@@ -399,7 +399,7 @@ function Stat({
   value: string;
   tone?: "good" | "bad";
 }) {
-  const color = tone === "good" ? "text-even" : tone === "bad" ? "text-sharp" : "text-body";
+  const color = tone === "good" ? "text-even" : tone === "bad" ? "text-warn" : "text-body";
   return (
     <div className="rounded-lg border border-line bg-surface px-4 py-3">
       <div className="text-xs uppercase tracking-wider text-muted">{label}</div>

@@ -85,70 +85,82 @@ my taleem never reached.
 
 ## 5. The core flow
 
-Six phases. The app walks through them in order, but any phase can be entered
-directly.
+**Rewritten 2026-09-01 per D16/D17/D18.** Two earlier designs are discarded: a
+six-phase version opening with a `Tun` anchor, and a survey version that walked
+sixteen labelled ghars. Both were the software's idea of the task, not the
+task. What follows matches described practice.
 
-### Phase 0 — Setup (once)
-Enter the dayan's diameter. Physically mark **ghar 1** on the drum with a small
-piece of tape, so numbering is consistent between sessions. The app explains
-where to put it and why it matters.
+The governing correction: **the note comes first, and evenness is the result,
+not the method.** You decide the note before picking up the hammer, then bring
+every position to that note. When they all match, the drum is even *and* on
+pitch — never two goals, always one.
 
-### Phase 1 — Anchor
-Play a few `Tun` strokes at the centre. The app establishes the drum's current
-absolute pitch: `271 Hz — C#4, Kali 1, 24 cents flat`. This f0 becomes the
-reference band for everything that follows.
+### Step 0 — Headroom (D17)
 
-### Phase 2 — Survey
-The app calls out ghar 1. You strike `Na` there three times. It hears each
-strike, records it, and **automatically advances** to ghar 2. Around the drum,
-16 positions, roughly two minutes. Median of three strikes per ghar; the spread
-across the three becomes a confidence indicator.
+Look at where the 8 gattas sit on the lace. High means room to tighten; already
+near the bottom means the drum is at its ceiling and cannot go higher.
 
-### Phase 3 — Diagnose
-A polar map of the drum. Sixteen spokes, colour-coded: blue for flat, green for
-even, red for sharp, with the deviation in cents at each. One headline number:
+If the target is out of reach, **the app says so and stops.** Forcing it splits
+the head, and a lace out of travel is a craftsman's re-lace, not a tuning
+session. This is the first screen because it decides whether the rest is
+possible.
 
-> **Spread: 34 cents.** Ghar 11 and 12 are notably flat. Aim for under 10.
+### Step 1 — The note
 
-This screen alone is the thing that doesn't exist anywhere else.
+Either the app suggests from where the drum already sits ("you're near C#"), or
+you pick from twelve. The octave is inferred from the drum and never asked
+about — a dayan lives roughly D3–G4, so there is usually only one reachable
+answer.
 
-### Phase 4 — Correct
-Guided, one instruction at a time, following the traditional opposite-side
-sequence (`1, 9, 14, 6, 11, 3, 8, 16, 5, 13, 2, 10, 15, 7, 12, 4`) but skipping
-ghars that are already fine:
+An optional drone at the target is available for the ear. Off by default; the
+measurement is the truth (D18).
 
-> **Ghar 11 — 18 cents flat.** Flat face of the hathori, strike *down* on the
-> gajra, in the middle of the gap. Two or three light taps. Then re-measure.
+### Step 2 — Tune
 
-After each correction it re-measures that ghar **and its opposite**, because
-tension moves across the head.
+Strike `Na` at the kinar. One large reading: how far off, which way. Hammer.
+Strike again. Rotate when satisfied. Repeat around the drum.
 
-### Phase 5 — Converge
-Loop back to Phase 2 until the spread is under threshold. The app tracks
-progress across passes so you can see it tightening.
+**The app does not know or track where you are (D16).** No ghar numbers, no
+position prompts, no counting. You are looking at the drum; it isn't.
 
-### Phase 6 — Pull to scale
-Only now, with an even head, move the whole drum onto the target note using the
-gattas in `1-5, 2-6, 3-7, 4-8` order. Then re-check evenness, because coarse
-tuning disturbs it.
+### Step 3 — See the evenness
 
-## 6. The scale-teaching module
+A rolling, unlabelled trail of the last ~16 readings. Scattered means uneven; a
+tight cluster on the target means tuned. The objective picture, with none of
+the position-tracking machinery.
 
-Not a wall of text. Contextual, answering the questions actually being asked.
+### Done when
 
-- **"What can my drum even do?"** From the diameter: a safe range, with a hard
-  warning line. A 5.5" head forced to E will split. This is a safety feature,
-  not a nicety.
-- **"What note is this called?"** Western ↔ Kali/Safed mapping, always shown
-  together.
-- **"What should I tune to?"** The ladder: **Sa** is always right; **Pa** is the
-  strong fallback; **Ma** when the raga omits the fifth; Dha/Ga as last resorts;
-  and avoid tivra Ma, Re and Ni — they fight the drone.
-- **"I'm playing along to something."** A drone reference (tanpura-ish sustained
-  tone) at the chosen Sa, so I can tune against it by ear as well as by eye.
-- **"I'm playing alone."** A *find-my-drum's-natural-pitch* mode: where does
-  this head sit happiest with least tension asymmetry? Often the right answer
-  for solo riyaz.
+Every rotation gives the same reading, and it sounds right to you. Your ear is
+the stop condition; the trail is the evidence.
+
+### Explicitly not in the flow
+
+- No `Tun` stroke — not how anyone tunes
+- No ghar identity, numbering, or reference mark
+- No scale theory gate before you can start
+- No survey-then-act phase separation
+
+## 6. Pitch on screen
+
+One small number, off to the side: roughly what note the drum is sitting at.
+`C#`, and nothing more.
+
+- **No Kali/Safed naming.** The mapping stays in `cents.ts` but nothing renders
+  it. It was clutter to the one person using this.
+- **No octave numbers, no Hz** outside diagnostics.
+- Cents appear per-ghar and as the spread, because that is the number that
+  visibly improves as you work.
+
+Absolute pitch costs nothing to obtain — the band-constrained detector resolves
+it from `Na` alone — so this is purely a display decision and reversible.
+
+### Cut from v1 (was D6, superseded by D13)
+
+The scale-teaching module: raga-aware targets, the Sa/Pa/Ma ladder, drone
+reference, natural-pitch finder. All of it deferred. The one piece worth
+keeping is the **diameter safety rail** (§7), which is not teaching — it stops
+the app suggesting a tension that splits a head.
 
 ## 7. What the app must be honest about
 

@@ -136,6 +136,171 @@ actual drum — see `INSTRUMENT.md`. Reported as a *hint*, never a diagnosis
 
 ---
 
+## D13 — Na only. No Tun phase, no scale theory in the flow
+**2026-09-01 · User correction. Supersedes parts of D3, D6 and all of D12.**
+
+The player's objection, verbatim: *"whenever I have seen someone play tabla or
+tune it, they only check the kenar. The na sound is what gets tuned. If the na
+sound from all the sides is equal, the middle portion, the syahi, would always
+be in tune... there is so much naming. I just want a simple place wherein if I
+play the na sound on all the 16 ghars, I should be able to do something with
+it."*
+
+**The sources agree with him, including ones already in RESEARCH.md.** The
+tuning sequence documentation: *"practitioners play a strong 'na' on the chaati
+after tuning each ghar, rotating the tabla and repeating after every ghar."*
+Courtney's stated reason for preferring `Na` over `Tun` for tuning: it reveals
+localized tension variation around the perimeter. `Tun` is a diagnostic of
+overall resonance, not a step in the tuning loop.
+
+The `Tun` anchor phase was designed around a DSP worry, not around practice.
+
+### Why it was never needed
+
+For evenness the harmonic ambiguity cancels exactly. If the detector locks onto
+the 3rd partial at ghar 4 *and* at ghar 12:
+
+    1200 * log2(3*f12 / 3*f4)  ==  1200 * log2(f12 / f4)
+
+The factor of 3 divides out identically. Locking onto the "wrong" partial costs
+nothing **provided it is the same wrong partial each time** — which is achieved
+by anchoring the search band on the first `Na` strike of the pass. No separate
+stroke, no separate phase.
+
+### Consequences
+
+- The anchor phase, the `Tun` stroke and the mode switch are **removed**.
+- Absolute pitch still falls out of `Na` for free (the 150-400 Hz band already
+  resolves it; tests confirm this down to a -34 dB fundamental). It is a
+  *display* choice now, not an architectural one.
+- **D12 is withdrawn.** The Na/Tun syahi hint required a stroke we no longer
+  ask for. A drum whose spread refuses to come down across passes is a similar
+  signal and costs nothing, so that replaces it.
+- Kali/Safed naming is **out of the interface**. The mapping stays in
+  `cents.ts` — it is harmless and may be wanted later — but nothing renders it.
+- The scale-teaching module (D6) is **cut from v1**.
+
+### What the player still wants
+
+Guidance was never the problem. Asked how far the app should go, he chose the
+**full guided loop** — measure, show, correct, re-measure, until even. The
+objection was to ceremony *before being allowed to start*, not to help.
+
+---
+
+## D14 — The drum rotates; the striking hand stays put
+**2026-09-01 · User-confirmed**
+
+Positions are reached by turning the tabla under a fixed striking hand, not by
+reaching around a stationary drum. Matches the sources ("rotating the tabla and
+repeating after every ghar") and matches how the original problem was
+described — *"if I rotate it the sound isn't the same."*
+
+Consequences:
+
+- The instruction between readings is **"turn one ghar"**, never a position name.
+- The app counts strikes and infers position; it cannot see the drum. Losing
+  your place is therefore possible, so an undo and a restart-pass are required.
+- One physical reference mark is needed to know where a pass began. The teal
+  dots already on the head (INSTRUMENT.md) serve; only "which one is first"
+  needs deciding.
+- Striking consistency is *better* under this model than reaching around, since
+  hand position and angle stay constant. Good for measurement noise.
+
+---
+
+## D15 — Sixteen positions, not four
+**2026-09-01**
+
+Prior art found late: `aituning.netlify.app` (Nov 2025, by a 15-year player) is
+a browser tabla tuner that does include a tension map — but at **four**
+positions (12-3-6-9), behind a required raga-and-Sa selection screen, using FFT
+peak-picking with hand-written harmonic correction.
+
+It narrows the gap without closing it. Sixteen ghars, `na` only, no theory
+gate, and NSDF rather than peak-picking remains unbuilt by anyone.
+
+---
+
+## D16 — The app does not track which ghar you are on
+**2026-09-01 · User correction. Supersedes the survey model in D13/D14.**
+
+*"It doesn't need to identify each ghar, all those 16 ghars, how each one of
+them sounds."*
+
+The survey framing — walk sixteen labelled positions, build a map, then act on
+it — was mine, not the practice. You are looking at the drum. You know where
+your hand is. The app never needs to.
+
+**What this deletes:**
+
+- Ghar numbering and the ghar-1 reference mark
+- Position tracking, strike counting, "turn one ghar" prompts
+- The count-and-infer failure mode, and the undo / restart-pass it required
+- The polar ring diagram with labelled spokes
+- The whole notion of a "pass" as a discrete unit
+
+**What remains** is a live readout. Strike `Na` → one number, how far off and
+which way → hammer → strike again → rotate when satisfied. The app is a
+continuously available reference, not a survey instrument.
+
+### Seeing evenness without position identity
+
+Evenness still has to be visible, or the tool loses its point. Solution: a
+**rolling trail of the last ~16 readings, unlabelled**. Scatter means uneven; a
+tight cluster on the target means tuned. You get the objective picture without
+the app ever knowing which spot produced which mark.
+
+---
+
+## D17 — Gatta position is the headroom indicator, and it gates everything
+**2026-09-01 · User insight, source-confirmed**
+
+*"It depends on how tightly the 8 blocks are attached to it. If they are very
+far low then the tabla can't be pitched to a higher note."*
+
+The 8 gattas ride on the lace between the rims. Driving them **down** shortens
+the lace path, raises tension, raises pitch. Their current position is therefore
+a direct, visible readout of **how much tuning range is left**:
+
+- Blocks sitting **high** → plenty of travel, room to tighten
+- Blocks already **near the bottom** → at the ceiling. The drum cannot go
+  higher. Hammering to force it risks splitting the head.
+
+Source confirmation: a head tunes roughly 1–2 scales either side of its design
+range, and *"lacing that has stretched beyond tuning range needs replacement by
+a craftsman."* Out of travel is a **re-lace job, not a tuning job** — no
+software helps.
+
+**Consequences:**
+
+- A **headroom check comes before anything else.** If the target is above what
+  the blocks allow, the app must say so and stop, not offer guidance.
+- This is a better safety rail than the diameter table (RULES C1), because it
+  reflects the drum's actual present state rather than a generic size prior.
+  The diameter table stays as a coarse sanity bound.
+- Worth capturing the block position at the start of a session.
+
+---
+
+## D18 — Reference tone optional; measurement is the truth
+**2026-09-01 · User decision**
+
+A drone at the target is available but off by default, and the app does not ask
+the ear to arbitrate its numbers.
+
+Accepted cost, stated plainly: on a drum with stretched partials the absolute
+reading may sit up to ~20 cents from what the ear calls in tune (see the
+inharmonicity tests in `mpm.test.ts`). Relative accuracy is unaffected at under
+3 cents, so *evenness* remains exact; only the absolute target may be biased.
+Revisit if that bias proves audible in practice.
+
+Target note is set **either** by the app suggesting from the drum's current
+pitch **or** by picking from a list of twelve. Octave is inferred from the drum
+and never asked about.
+
+---
+
 ## Open questions
 
 - **Dayan diameter** — photo estimate **~5.0–5.3"**, working assumption 5.25".
