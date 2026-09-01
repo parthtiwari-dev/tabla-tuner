@@ -22,12 +22,10 @@ Visible in the photos, and it settles decision D8:
 - **Small teal/green marks** at regular intervals just inside the gajra —
   these appear to sit at the lace holes
 
-That last point is a useful accident: **the ghar positions are already visually
-marked on the drum.** No need to add sixteen marks — only to agree which one is
-ghar 1.
+The 16-ghar / 8-gatta construction in `RESEARCH.md` applies to this drum.
 
-The 16-ghar / 8-gatta model in `RESEARCH.md` applies to this drum. All guidance
-targets it as designed.
+*(The teal marks were once going to serve as position references. The app no
+longer tracks position at all — D16 — so they are just a nice detail.)*
 
 ---
 
@@ -69,8 +67,11 @@ not the outer braid. Sight straight down, not at an angle.
 The diameter table is a **prior, not a measurement**. Its real job is the safety
 rail (RULES C1) — stopping the app from suggesting a tension that splits the
 head. The *actual* answer to "what scale does this drum want" comes from
-measuring what the drum does, which M1 gives us directly. A rough diameter is
-enough to bound the danger zone; the drum tells us the rest.
+measuring what the drum does, which the tuner reports on the first strike. A
+rough diameter is enough to bound the danger zone; the drum tells us the rest.
+
+In practice **gatta travel is the better limit** (D17) — it reflects the drum's
+present state rather than a generic size prior, and it is what the app checks.
 
 ---
 
@@ -123,10 +124,9 @@ tune it. It becomes a re-syahi job.
    drum is otherwise evenly tuned — that points at the syahi rather than at
    your tuning.
 
-Test 3 is worth noting: **the app performs it automatically.** The anchor step
-already reads `Tun`, and the survey already reads `Na`. Comparing them costs
-nothing and turns a latent diagnosis into a visible one. Folded into the PRD as
-a stated behaviour (PRD §7).
+Test 3 is a manual check only. An earlier design had the app perform it, but
+that required a `Tun` stroke nobody tunes with, and the whole idea was
+withdrawn (D13). Do it by ear if the drum ever stops behaving.
 
 ---
 
@@ -144,8 +144,7 @@ future work.
 
 - [ ] Confirm playing-surface diameter with a flat, centred, straight-down
       measurement
-- [ ] Count the lace runs down the shell — expect **16**
-- [ ] Count the gattas — expect **8**
+- [ ] Count the gattas — expect **8**, and note how far down the lace they sit
+      (this is the headroom check, D17)
 - [ ] Do the three-step syahi check above
-- [ ] Choose and mark **ghar 1** on one of the existing teal dots
 - [ ] Identify the second drum

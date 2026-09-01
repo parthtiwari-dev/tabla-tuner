@@ -1,6 +1,9 @@
 # PRD — Tabla Tuner
 
-Version 0.1 · 2026-09-01 · Status: agreed, pre-build
+Version 1.0 · 2026-09-01 · Status: **shipped and used successfully**
+
+Sections 5 onward were rewritten twice as the player corrected the design. The
+superseded versions are in `DECISIONS.md`, not here.
 
 ## 1. The problem
 
@@ -43,7 +46,8 @@ Three facts, established in `docs/RESEARCH.md`:
    It splits the membrane's degenerate (1,1) mode. The effect I hear is physics,
    not imagination.
 3. **Evenness is a *relative* measurement.** We don't need the true absolute
-   pitch of a `Na` stroke — only ghar 4 versus ghar 12. Compare like with like
+   pitch of a `Na` stroke to compare one part of the rim with another. Compare
+   like with like
    and the harmonic ambiguity cancels out.
 
 Measurement resolution is ~±2 cents; real unevenness is 10–50 cents. An order of
@@ -52,13 +56,13 @@ magnitude of headroom.
 ## 3. Goals
 
 **Primary.** Let me see, as a picture, how evenly my dayan is tuned around its
-circumference — and tell me which ghar to hit, in which direction, in what order.
+circumference, so I can act on it with a hammer I already know how to use.
 
-**Secondary.** Tell me what note the drum is currently at, in both Western and
-Indian naming, and help me move the whole drum onto a chosen scale.
+**Secondary.** Tell me what note the drum is currently at, so I can pick a
+target without guessing.
 
-**Tertiary.** Teach me *which* scale I should be tuning to and why — the thing
-my taleem never reached.
+**Cut (was tertiary).** Teaching which scale to tune to. Built, then removed:
+it was theory standing between me and the drum (D13).
 
 ### Non-goals
 
@@ -75,11 +79,11 @@ my taleem never reached.
 | Question | Decision |
 |---|---|
 | Form factor | **Fully responsive** — phone propped up and laptop, both first-class |
-| Advancing through the survey | **Auto-advance on detected strike** — hands-free, since both hands are occupied |
-| v1 scope | **Everything**: survey + tuner + scale-teaching |
-| Priority when goals conflict | **Evenness first**, then pull the whole drum to the target scale |
+| Interaction | **Continuous listening, zero touches** — both hands are occupied (D19) |
+| Scope | **One screen.** Survey model, ghar identity and scale-teaching all built, rejected, deleted |
+| Order of work | **The note comes first**; evenness is the result of every position matching it, not a separate stage |
 | Drum type | Traditional — leather lace, 8 wooden gattas, 16-hole gajra |
-| Diameter | To be measured; entered once as a setting |
+| Range limit | **Gatta travel**, checked by eye before starting (D17) — a better signal than drum diameter, since it reflects the drum's present state |
 | Use case | Both solo riyaz and accompanying a reference pitch |
 | Hammer | A proper hathori is available |
 
@@ -148,9 +152,8 @@ One small number, off to the side: roughly what note the drum is sitting at.
 
 - **No Kali/Safed naming.** The mapping stays in `cents.ts` but nothing renders
   it. It was clutter to the one person using this.
-- **No octave numbers, no Hz** outside diagnostics.
-- Cents appear per-ghar and as the spread, because that is the number that
-  visibly improves as you work.
+- **No octave numbers.** The target's Hz appears once, small, beside the note.
+- Cents are the reading, and the only number that matters.
 
 Absolute pitch costs nothing to obtain — the band-constrained detector resolves
 it from `Na` alone — so this is purely a display decision and reversible.
@@ -166,36 +169,50 @@ the app suggesting a tension that splits a head.
 
 Trust matters more than features here, because bad advice breaks a real drum.
 
-- **It cannot tell you how hard to hit.** Not derivable from theory. v1 says
-  "light taps, re-measure often." v2 learns it from my own logged before/after
-  data — see §9.
-- **A persistent `Na` vs `Tun` mismatch is a hint about the instrument**, not a
-  tuning error. It usually means the syahi-to-edge thickness ratio is off. The
-  app says so and stops there.
+- **It could not originally tell you how hard to hit** — not derivable from
+  theory, only from your own hand. It now learns exactly that by counting your
+  hammer blows through the microphone (§9), and says nothing until it has
+  enough evidence rather than guessing.
+- **It does not diagnose the instrument.** An earlier design compared `Na`
+  against `Tun` to hint at a syahi problem; it needed a stroke nobody tunes
+  with, and was withdrawn (D13). A drum that will not come onto pitch across
+  repeated corrections is the signal that remains.
 - **Low-confidence readings are shown as low-confidence,** never silently
-  guessed. A greyed-out ghar with "couldn't hear that clearly, strike again" is
-  correct behaviour. Confident wrong numbers are the worst possible failure.
+  guessed. A strike that does not agree with itself across sub-windows is
+  dropped and the display holds still. Confident wrong numbers are the worst
+  possible failure.
 - **Range warnings are hard blocks,** not suggestions.
 
-## 8. Success criteria
+## 8. Success criteria — met
 
 The project succeeds if, after using it, I can tune my own dayan so it sounds
-the same all the way around — without a teacher. Concretely:
+the same all the way around, without a teacher.
 
-1. A full survey takes under 3 minutes.
-2. Repeating a survey without touching the drum reproduces each ghar within
-   5 cents. *(If this fails, nothing else matters — measure it first.)*
-3. Following the guidance reduces measured spread pass over pass.
-4. The end state passes my own ear: rotating the drum, `Na` sounds the same.
+**It did.** First real session, in his words: *"the first time in years that I
+was able to tune my tabla properly without needing guidance from someone."* The
+app independently found the pitch he had been tuning to by ear for years, which
+is the strongest evidence available that the detector is right rather than
+merely plausible.
 
-Criterion 4 is the real one. Everything else is instrumentation.
+The one shortfall reported was reading-to-reading jitter on an unchanged spot,
+addressed in D22 — peak alignment, per-strike self-consistency, and median
+display smoothing.
 
-## 9. Later, explicitly not now
+The planned go/no-go test (ten strikes, spread under 5 cents) was **retired
+unrun**. A successful tuning session answers the same question better.
 
-- **Personal hammer calibration.** Every correction logs cents-before,
-  cents-after, and tap count. After enough data: "for you, one light tap at a
-  ghar moves it about 7 cents." This is the honest way to answer §7's first
-  point, and it costs nothing now beyond logging.
-- Session history and drift tracking over weeks — does ghar 12 always go flat?
-- Bayan support.
-- Recording and exporting a stroke for a teacher to listen to.
+## 9. Shipped since, and not shipped
+
+**Shipped: personal hammer calibration** (D19). Every correction logs
+cents-before, cents-after and tap count, and the taps are counted from the
+microphone rather than entered. After a few corrections: *"your taps ≈ 7 cents
+each."* This turned out to be the honest answer to §7's first point, and it
+arrived far earlier than planned because the player pointed out that hammer
+blows reaching the mic were a feature rather than a problem.
+
+**Not shipped, deliberately:**
+
+- Bayan support — inharmonic and pitch-bent in play, a materially harder problem
+- Session history and drift tracking over weeks
+- Recording and exporting a stroke for a teacher
+- Anything requiring a second screen (E5)
