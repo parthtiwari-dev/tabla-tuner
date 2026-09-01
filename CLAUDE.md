@@ -6,13 +6,16 @@ Guidance for Claude Code when working in this repository.
 
 A tabla tuner for the web. Personal tool, one user, built from first principles.
 
-It is **not** another chromatic tuner. Its reason to exist is the *evenness*
-problem: a tabla dayan can be perfectly on-pitch at one point on the rim and
-noticeably off at another, and no existing tool measures that. This app surveys
-all 16 ghars around the crown, maps which are flat and which are sharp, and
-tells you where to hit.
+It is **not** another chromatic tuner, and it is **not** a survey instrument.
 
-If a change doesn't serve that, question whether it belongs.
+The player has ten years of hammer skill. What he lacks alone is *perception*
+of the error and *memory* of what the last few minutes of hammering did. The
+app supplies exactly those two and stays quiet otherwise. It does not track
+position, name ghars, teach scales, or say which way to hit — every one of
+those was built, rejected by him, and deleted (D13, D16, D19, D21).
+
+One page at `/`. If a change doesn't serve the two things above, it doesn't
+belong.
 
 ## Read first
 
@@ -27,15 +30,16 @@ If a change doesn't serve that, question whether it belongs.
 
 ## The one idea that makes this work
 
-Absolute pitch detection on a `Na` stroke is unreliable — `Na` has a suppressed
-fundamental and a dominant 3rd harmonic, so naive detectors report the wrong
-octave. But **evenness is a relative measurement**. We anchor the absolute
-pitch once from a `Tun` stroke (which has a real fundamental), then compare
-`Na` strokes *to each other* across the 16 positions. Like-for-like comparison
-makes the harmonic ambiguity cancel.
+`Na` — the only stroke anyone tunes with — has a suppressed fundamental and a
+dominant 3rd harmonic, so naive detectors report a twelfth too high.
 
-Never let a change break this separation. Absolute readings come from `Tun`.
-Relative readings come from `Na`, band-constrained around the anchor.
+The guard is **structural, not corrective**: the search band is constrained so
+the error cannot be expressed. A dayan lives roughly 150-400 Hz, so a
+third-harmonic candidate at 780 Hz is not a value the function can return. Once
+a target note is chosen the band narrows to +/-500 cents around it.
+
+Never replace this with post-hoc octave correction. Making an error impossible
+beats detecting and fixing it.
 
 ## Stack
 
@@ -59,23 +63,20 @@ Relative readings come from `Na`, band-constrained around the anchor.
 
 ## Testing audio without a tabla
 
-You will usually not have a drum available. Generate synthetic test signals —
-a harmonic stack at a known f0 with the 1:2:3:4:5 ratios and an exponential
-decay, plus a "Na-like" variant with the fundamental attenuated 20 dB. The
-detector must return the correct f0 for both. Fixtures live in
-`src/lib/audio/__fixtures__/`.
-
-Real recordings, once we have them, go in `docs/samples/` with a README noting
-the drum, the ghar, and the measured pitch.
+You will usually not have a drum available. Fixtures in
+`src/lib/audio/__fixtures__/` generate synthetic strokes: a 1:2:3:4:5 harmonic
+stack with per-partial exponential decay, plus a `Na`-like variant with the
+fundamental attenuated 20 dB. **The detector must get both right** — the second
+is the whole point.
 
 ## Conventions
 
 - Indian terms in code use the transliterations in `docs/RESEARCH.md`
   (`ghar`, `gatta`, `gajra`, `syahi`, `dayan`, `bayan`, `pudi`, `hathori`).
   Don't anglicise them and don't invent new spellings.
-- Ghars are numbered **1–16**, one-indexed, matching how a player counts them.
-  Convert to zero-indexed only at array boundaries and comment where you do.
 - Pitch error is always in **cents**, never Hz, in anything user-facing.
+- Western note letters only. No Kali/Safed, no octave numbers — the mapping
+  survives in `cents.ts` but nothing renders it (D13).
 
 <!-- BEGIN:nextjs-agent-rules -->
 

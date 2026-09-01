@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   TuningSession,
   spread,
-  trend,
+  displayCents,
   centsPerTap,
   TRAIL_LENGTH,
   type Strike,
@@ -45,22 +45,29 @@ describe("spread", () => {
   });
 });
 
-describe("trend", () => {
-  it("says unknown without enough data", () => {
-    expect(trend(strikesAt([1, 2, 3]))).toBe("unknown");
+describe("displayCents", () => {
+  it("is the latest reading when there is only one", () => {
+    expect(displayCents(strikesAt([12]))).toBeCloseTo(12, 6);
   });
 
-  it("detects converging", () => {
-    expect(trend(strikesAt([1, -1, 2, 0, 18, -15, 12, -20]))).toBe("converging");
+  it("medians away a single outlier on one spot", () => {
+    // The complaint: same place, same stroke, one reading jumps. The median
+    // of three ignores it instead of showing it.
+    expect(displayCents(strikesAt([4, -6, -5]))).toBeCloseTo(-5, 6);
   });
 
-  it("detects diverging — the case that matters most", () => {
-    // "Those last taps made it worse." Without this he keeps hammering.
-    expect(trend(strikesAt([22, -19, 17, -25, 2, -1, 3, 0]))).toBe("diverging");
+  it("follows you immediately when you move to a different spot", () => {
+    // A median across two different places describes nowhere, so a wide
+    // spread means show the latest.
+    expect(displayCents(strikesAt([40, -8, -6]))).toBeCloseTo(40, 6);
   });
 
-  it("calls small changes steady rather than guessing", () => {
-    expect(trend(strikesAt([5, -4, 6, -5, 5, -5, 6, -4]))).toBe("steady");
+  it("stays smooth while readings cluster", () => {
+    expect(displayCents(strikesAt([-12, -10, -11]))).toBeCloseTo(-11, 6);
+  });
+
+  it("is null with nothing to show", () => {
+    expect(displayCents([])).toBeNull();
   });
 });
 
@@ -186,18 +193,13 @@ describe("TuningSession", () => {
     expect(session.snapshot().latest!.cents).toBeCloseTo(5, 4);
   });
 
-  it("is not even until a full turn has been measured", () => {
+  it("exposes a smoothed value, not the raw latest", () => {
     const session = new TuningSession(TARGET);
-    for (let i = 0; i < 3; i++) na(session, 0);
-    expect(session.snapshot().even).toBe(false);
-  });
-
-  it("reports even once a full tight turn is in", () => {
-    const session = new TuningSession(TARGET);
-    for (let i = 0; i < TRAIL_LENGTH; i++) na(session, i % 2 ? 3 : -3);
-    const snap = session.snapshot();
-    expect(snap.spread).toBeCloseTo(6, 4);
-    expect(snap.even).toBe(true);
+    na(session, -6);
+    na(session, -5);
+    na(session, 4); // outlier
+    expect(session.snapshot().latest!.cents).toBeCloseTo(4, 4);
+    expect(session.snapshot().cents).toBeCloseTo(-5, 4);
   });
 
   it("keeps calibration but drops readings when the target changes", () => {
@@ -232,7 +234,7 @@ describe("classifyOnset", () => {
     const result = classifyOnset(synthNa(TARGET, { sampleRate: SR }), SR, {
       targetHz: TARGET,
     });
-    expect(result.onset.kind).toBe("na");
+    expect(result.onset?.kind).toBe("na");
   });
 
   it("calls a noisy inharmonic click a tap", () => {
@@ -244,12 +246,12 @@ describe("classifyOnset", () => {
       click[i] = (Math.random() * 2 - 1) * Math.exp(-i / (0.01 * SR));
     }
     const result = classifyOnset(click, SR, { targetHz: TARGET });
-    expect(result.onset.kind).toBe("tap");
+    expect(result.onset?.kind).toBe("tap");
   });
 
   it("still classifies a na correctly with no target yet", () => {
     const result = classifyOnset(synthNa(TARGET, { sampleRate: SR }), SR);
-    expect(result.onset.kind).toBe("na");
+    expect(result.onset?.kind).toBe("na");
     expect(result.hz).toBeCloseTo(TARGET, 0);
   });
 

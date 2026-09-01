@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { detectPitch, detectPitchNearAnchor, nsdf, findKeyMaxima } from "./mpm";
+import {
+  detectPitch,
+  detectPitchNearAnchor,
+  detectPitchRobust,
+  nsdf,
+  findKeyMaxima,
+} from "./mpm";
 import { centsBetween, shiftCents } from "./cents";
 import {
   synthTun,
@@ -236,5 +242,39 @@ describe("detectPitchNearAnchor", () => {
       100,
     );
     expect(result.hz).toBe(0);
+  });
+});
+
+describe("detectPitchRobust", () => {
+  it("agrees with itself on a clean stroke", () => {
+    const f0 = 277.18;
+    const result = detectPitchRobust(synthNa(f0, { sampleRate: SR }), SR);
+    expect(centsErr(result.hz, f0)).toBeLessThan(2);
+    expect(result.votes).toBe(3);
+    expect(result.agreementCents).toBeLessThan(5);
+  });
+
+  it("reports wide disagreement on noise, instead of a confident number", () => {
+    // This is the signal the interface uses to hold the display still rather
+    // than jumping to a reading it should not trust.
+    const n = Math.round(0.5 * SR);
+    const noise = new Float32Array(n);
+    for (let i = 0; i < n; i++) noise[i] = Math.random() * 2 - 1;
+
+    const result = detectPitchRobust(noise, SR, { clarityThreshold: 0 });
+    const unusable = result.hz === 0 || result.agreementCents > 18;
+    expect(unusable).toBe(true);
+  });
+
+  it("rejects rather than trusting a single lone estimate", () => {
+    const result = detectPitchRobust(synthSilence(500, SR), SR);
+    expect(result.hz).toBe(0);
+    expect(result.votes).toBeLessThan(2);
+  });
+
+  it("still finds a Na with a suppressed fundamental", () => {
+    const f0 = 261.63;
+    const result = detectPitchRobust(synthNa(f0, { sampleRate: SR }), SR);
+    expect(centsErr(result.hz, f0)).toBeLessThan(2);
   });
 });

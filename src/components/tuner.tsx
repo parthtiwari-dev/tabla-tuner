@@ -1,6 +1,6 @@
 "use client";
 
-import { TRAIL_LENGTH, type Strike, type Trend } from "@/lib/tuning/session";
+import { TRAIL_LENGTH, type Strike } from "@/lib/tuning/session";
 
 /** Full-scale deflection of the meter, in cents. */
 export const SCALE = 50;
@@ -80,46 +80,6 @@ export function Meter({
         ))}
       </div>
 
-    </div>
-  );
-}
-
-export function TrendLine({
-  spread,
-  count,
-  trend,
-  tolerance,
-}: {
-  spread: number;
-  count: number;
-  trend: Trend;
-  tolerance: number;
-}) {
-  const label =
-    trend === "converging"
-      ? "getting better"
-      : trend === "diverging"
-        ? "getting worse"
-        : trend === "steady"
-          ? "holding"
-          : "";
-
-  const tone =
-    trend === "converging" ? "text-even" : trend === "diverging" ? "text-warn" : "text-muted";
-
-  return (
-    <div className="flex items-baseline justify-between text-xs text-muted">
-      <span className="tabular">
-        spread{" "}
-        <span className={spread > 0 && spread <= tolerance ? "text-even" : "text-body"}>
-          {spread.toFixed(0)}
-        </span>{" "}
-        cents
-        <span className="ml-1.5 opacity-50">
-          {count}/{TRAIL_LENGTH}
-        </span>
-      </span>
-      <span className={tone}>{label}</span>
     </div>
   );
 }

@@ -350,3 +350,78 @@ cents-per-tap figure, which is informational only. Nothing acts on it.
 the hammer skill. What he lacks is *perception* of the error and *memory* of
 what the last few minutes did. The app supplies exactly those two and nothing
 else.
+
+---
+
+## D20 — One page. Diagnostics removed, tuner at the root
+**2026-09-01 · User decision, after first successful real-world use**
+
+The tuner worked: *"the first time in years that I was able to tune my tabla
+properly without needing guidance from someone."* It found the pitch he had
+been tuning to by ear for years, independently.
+
+Everything else goes. The diagnostics bench is deleted, the tuner moves to
+`/`, and `fft.ts` and `harmonics.ts` go with them — both existed only to serve
+diagnostics, and dead code in a repo someone may read is worse than the loss.
+
+The M1 go/no-go gate is **retired unrun**. It was there to decide whether the
+detector survived a real drum. A successful tuning session answers that better
+than the test would have.
+
+---
+
+## D21 — The "even" verdict was wrong and is removed
+**2026-09-01 · Correctness fix**
+
+Reported by use: playing one spot repeatedly filled the `16/16` counter, *"as
+if I was rotating my tabla, which wasn't the case."*
+
+Worse than cosmetic. The tolerance check looked at the last sixteen readings
+with no idea whether they came from one place or from all the way around, so
+the app would announce the drum was **even** after sixteen strikes on a single
+ghar. That is a false green light, and false confidence is precisely what this
+tool exists to prevent.
+
+Removed: the `16/16` counter, the `even` banner, the spread readout and the
+converging/diverging trend line. Spread across recent strikes conflates
+measurement noise with drum unevenness and cannot tell them apart without the
+position identity that D16 correctly deleted.
+
+The trail of recent readings stays — it is honestly just "recent readings", and
+it is useful either way.
+
+His framing, which is the right one: *"if you are tuning your tabla to a
+specific note and all the places on the tabla are pointing to a note, then it's
+tuned. There is no relationship with ghar."*
+
+---
+
+## D22 — Two fixes for measurement jitter
+**2026-09-01**
+
+The one substantive complaint: *"if I am playing a single sound 10 times,
+sometimes it would show that it's good... on the same note at the same place it
+can show sometimes deflections."*
+
+Both fixes were shipped without asking him to run a test, since both are
+correct independently of how bad the jitter measures.
+
+**Peak alignment (`onset.ts`).** A hard strike crosses the level trigger
+earlier in its attack than a soft one, so a fixed offset from the trigger
+samples different points in the decay depending on strike strength. Higher
+partials decay faster, so the partial balance — and the estimate — moves with
+it. Two identical-sounding strikes gave two different numbers. The analysis
+window now anchors on the attack **peak**, measuring every strike at the same
+point in its life. This is believed to be the main cause.
+
+**Self-consistency (`detectPitchRobust`).** Each strike is measured three times
+over overlapping sub-windows. A clean stroke is periodic throughout and all
+three agree; one spoiled by a room reflection or a glancing hit is not.
+Disagreement beyond 18 cents marks the onset `unclear` and the display holds
+still rather than jumping to a reading it should not trust. Adds a third
+classification outcome alongside `na` and `tap`.
+
+**Display smoothing (`displayCents`).** Median of the last three readings when
+they cluster; the latest reading when they span more than 30 cents, since a
+wide spread means he has moved to a different part of the drum and a median
+across two places would describe neither.

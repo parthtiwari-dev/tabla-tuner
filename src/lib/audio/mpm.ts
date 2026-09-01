@@ -225,9 +225,9 @@ export function detectPitch(
 }
 
 /**
- * Survey-mode detection: search only within `centsWindow` of a known anchor
- * frequency. This is the structural octave guard (RULES B3) and the reason the
- * evenness survey can trust `Na` strokes at all.
+ * Anchored detection: search only within `centsWindow` of a known frequency.
+ * This is the structural octave guard (RULES B3) — a 3rd-harmonic error sits
+ * +1902 cents away and simply cannot be returned.
  */
 export function detectPitchNearAnchor(
   samples: Float32Array,
@@ -242,4 +242,71 @@ export function detectPitchNearAnchor(
     fMin: anchorHz / factor,
     fMax: anchorHz * factor,
   });
+}
+
+export interface RobustPitchResult extends PitchResult {
+  /** Widest disagreement between sub-window estimates, in cents. */
+  agreementCents: number;
+  /** How many sub-windows produced a usable estimate. */
+  votes: number;
+}
+
+/**
+ * Measure one strike three times and see whether it agrees with itself.
+ *
+ * A single estimate over the whole decay cannot tell a clean stroke from one
+ * spoiled by a room reflection or a glancing hit — both come back with a
+ * confident-looking number. Splitting the tail into overlapping sub-windows
+ * gives an internal cross-check: a good strike is periodic throughout, so all
+ * three agree; a spoiled one does not.
+ *
+ * That disagreement is the honest confidence measure. The interface uses it to
+ * hold the display still rather than jumping to a reading it should not trust,
+ * which is where most visible jitter came from.
+ */
+export function detectPitchRobust(
+  samples: Float32Array,
+  sampleRate: number,
+  options: PitchOptions = {},
+): RobustPitchResult {
+  const sliceLength = Math.floor(samples.length * 0.6);
+  const offsets = [0, 0.2, 0.4].map((f) => Math.floor(samples.length * f));
+
+  const estimates: PitchResult[] = [];
+  for (const offset of offsets) {
+    if (offset + sliceLength > samples.length) continue;
+    const result = detectPitch(samples.subarray(offset, offset + sliceLength), sampleRate, options);
+    if (result.hz > 0) estimates.push(result);
+  }
+
+  if (estimates.length < 2) {
+    // One lone estimate is not evidence; it is a coin toss with a decimal
+    // point. Better to say nothing (RULES B4).
+    return {
+      hz: 0,
+      clarity: estimates[0]?.clarity ?? 0,
+      tau: 0,
+      ambiguous: false,
+      agreementCents: Infinity,
+      votes: estimates.length,
+      reason: "below-clarity",
+    };
+  }
+
+  const frequencies = estimates.map((e) => e.hz).sort((a, b) => a - b);
+  const mid = Math.floor(frequencies.length / 2);
+  const hz =
+    frequencies.length % 2 ? frequencies[mid] : (frequencies[mid - 1] + frequencies[mid]) / 2;
+
+  const agreementCents = 1200 * Math.log2(frequencies[frequencies.length - 1] / frequencies[0]);
+  const clarity = estimates.reduce((sum, e) => sum + e.clarity, 0) / estimates.length;
+
+  return {
+    hz,
+    clarity,
+    tau: sampleRate / hz,
+    ambiguous: estimates.some((e) => e.ambiguous),
+    agreementCents,
+    votes: estimates.length,
+  };
 }

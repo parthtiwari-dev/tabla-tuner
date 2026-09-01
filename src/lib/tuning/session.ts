@@ -54,7 +54,18 @@ export interface Correction {
   taps: number;
 }
 
-export type Trend = "converging" | "diverging" | "steady" | "unknown";
+/**
+ * How many recent readings the displayed number is drawn from. Small, so
+ * moving to a new spot is followed almost immediately.
+ */
+const SMOOTHING_WINDOW = 3;
+
+/**
+ * If recent readings span more than this, you have moved to a different part
+ * of the drum rather than repeating one spot — so show the latest reading
+ * rather than a median across two different places.
+ */
+const MOVED_CENTS = 30;
 
 /**
  * Spread: the gap between the flattest and sharpest reading, in cents.
@@ -74,24 +85,28 @@ export function meanOffset(strikes: Strike[]): number {
 }
 
 /**
- * Better or worse? Compares the recent half of the trail against the older
- * half.
+ * The number to put on screen.
  *
- * Deliberately blunt, and biased toward saying nothing. A confident wrong
- * verdict here would send him hammering in the wrong direction, which is
- * precisely the failure the whole tool exists to prevent — so anything short
- * of a clear signal returns "steady".
+ * Not simply the latest reading. A `na` genuinely varies a little strike to
+ * strike, and the raw value twitching on an unchanged spot reads as the tool
+ * being unreliable — which was the one complaint about it.
+ *
+ * So: when recent readings cluster, show their median, which kills the odd
+ * outlier. When they scatter widely, you have moved to a different part of the
+ * drum, and a median across two different places would be a number describing
+ * nowhere — so show the latest instead and follow you immediately.
  */
-export function trend(strikes: Strike[], minPerHalf = 4): Trend {
-  if (strikes.length < minPerHalf * 2) return "unknown";
+export function displayCents(strikes: Strike[]): number | null {
+  if (!strikes.length) return null;
 
-  const mid = Math.floor(strikes.length / 2);
-  const recent = strikes.slice(0, mid); // strikes are newest-first
-  const older = strikes.slice(mid);
+  const recent = strikes.slice(0, SMOOTHING_WINDOW);
+  if (recent.length < 2) return recent[0].cents;
 
-  const delta = spread(recent) - spread(older);
-  if (Math.abs(delta) < 3) return "steady";
-  return delta < 0 ? "converging" : "diverging";
+  if (spread(recent) > MOVED_CENTS) return recent[0].cents;
+
+  const sorted = recent.map((s) => s.cents).sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /**
@@ -116,12 +131,11 @@ export function centsPerTap(corrections: Correction[], minSamples = 3): number |
 
 export interface SessionSnapshot {
   latest: Strike | null;
+  /** The smoothed value to display. See displayCents. */
+  cents: number | null;
   trail: Strike[];
-  spread: number;
-  trend: Trend;
   pendingTaps: number;
   centsPerTap: number | null;
-  even: boolean;
   corrections: number;
 }
 
@@ -210,15 +224,12 @@ export class TuningSession {
   }
 
   snapshot(): SessionSnapshot {
-    const trail = this.trail;
     return {
       latest: this.strikes[0] ?? null,
-      trail,
-      spread: spread(trail),
-      trend: trend(trail),
+      cents: displayCents(this.strikes),
+      trail: this.trail,
       pendingTaps: this.taps,
       centsPerTap: centsPerTap(this.corrections),
-      even: trail.length >= TRAIL_LENGTH && spread(trail) <= this.tolerance,
       corrections: this.corrections.length,
     };
   }

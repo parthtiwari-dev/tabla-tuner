@@ -13,7 +13,7 @@
 
 export interface StrikeDetectorOptions {
   sampleRate: number;
-  /** Discard this much after the trigger before analysing. */
+  /** Discard this much after the attack peak before analysing. */
   attackSkipMs?: number;
   /** Length of the decay tail handed to the pitch detector. */
   analysisMs?: number;
@@ -23,6 +23,8 @@ export interface StrikeDetectorOptions {
   triggerRatio?: number;
   /** Level must also exceed this absolute RMS, to ignore a silent room. */
   absoluteFloor?: number;
+  /** How long after the trigger to look for the true attack peak. */
+  peakSearchMs?: number;
 }
 
 type State = "idle" | "capturing" | "refractory";
@@ -40,6 +42,7 @@ export class StrikeDetector {
   private readonly refractory: number;
   private readonly triggerRatio: number;
   private readonly absoluteFloor: number;
+  private readonly peakSearch: number;
 
   private state: State = "idle";
   private capture: Float32Array;
@@ -54,11 +57,12 @@ export class StrikeDetector {
   constructor(options: StrikeDetectorOptions) {
     const {
       sampleRate,
-      attackSkipMs = 30,
+      attackSkipMs = 25,
       analysisMs = 500,
       refractoryMs = 250,
       triggerRatio = 4,
       absoluteFloor = 0.008,
+      peakSearchMs = 30,
     } = options;
 
     this.sampleRate = sampleRate;
@@ -67,8 +71,9 @@ export class StrikeDetector {
     this.refractory = Math.round((refractoryMs / 1000) * sampleRate);
     this.triggerRatio = triggerRatio;
     this.absoluteFloor = absoluteFloor;
+    this.peakSearch = Math.round((peakSearchMs / 1000) * sampleRate);
 
-    this.capture = new Float32Array(this.attackSkip + this.analysisLength);
+    this.capture = new Float32Array(this.peakSearch + this.attackSkip + this.analysisLength);
   }
 
   get level(): number {
@@ -110,8 +115,29 @@ export class StrikeDetector {
       this.captured += take;
 
       if (this.captured >= this.capture.length) {
-        // Drop the attack; keep only the tonal decay.
-        const window = this.capture.slice(this.attackSkip);
+        // Align to the attack PEAK, not to the level trigger.
+        //
+        // A hard strike crosses the trigger threshold earlier in its attack
+        // than a soft one, so measuring at a fixed offset from the trigger
+        // samples different points in the decay depending on how hard you
+        // hit. Higher partials die faster than the fundamental, so the
+        // partial balance — and therefore the estimate — shifts with strike
+        // strength. That is the main source of reading-to-reading jitter on
+        // an otherwise identical stroke. Anchoring on the peak measures every
+        // strike at the same point in its life.
+        let peakIndex = 0;
+        let peak = 0;
+        for (let i = 0; i < this.peakSearch; i++) {
+          const magnitude = Math.abs(this.capture[i]);
+          if (magnitude > peak) {
+            peak = magnitude;
+            peakIndex = i;
+          }
+        }
+
+        const start = peakIndex + this.attackSkip;
+        const window = this.capture.slice(start, start + this.analysisLength);
+
         this.state = "refractory";
         this.refractoryLeft = this.refractory;
         this.captured = 0;
